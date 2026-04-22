@@ -28,16 +28,30 @@ lake build
 ## Generating Slides
 
 ```
-lake build && lake exe svil2026
+lake build && lake exe svil2026 --output _slides
 ```
 
-The slides are written to `_slides/index.html`. To view them locally:
+The slides are written to `_slides/index.html`.
+
+## Local Development
+
+For a live edit-and-preview workflow, run these two commands in separate terminals:
+
+**Terminal 1** — rebuild slides automatically on every file save:
 
 ```
-python3 -m http.server 9090 --directory _slides
+git ls-files | entr -c sh -c 'lake build && lake exe svil2026 --output _slides'
 ```
 
-Then open http://localhost:9090.
+Requires [`entr`](https://eradman.com/entrproject/) (`brew install entr` on macOS).
+
+**Terminal 2** — serve the slides locally:
+
+```
+python3 -m http.server 8765 --directory _slides
+```
+
+Then open http://localhost:8765. Refresh the browser after each save to see the updated slides.
 
 ## License
 
@@ -57,6 +71,8 @@ Apache 2.0
   particular a template for slides at
   https://github.com/leanprover/verso-templates/tree/main/slides
 
+- exemplo de slides do Leo em
+  https://github.com/leodemoura/ETAPSTutorial2026
 
 ### about the content 
 

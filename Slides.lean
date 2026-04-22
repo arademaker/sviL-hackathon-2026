@@ -8,6 +8,20 @@ set_option verso.code.warnLineLength 80
 
 #doc (Slides) "Porting s2n-bignum to Lean 4" =>
 
+```css
+table.slide-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0.5em 0 !important;
+}
+.reveal pre {
+  align-self: center !important;
+  width: fit-content !important;
+  max-width: 80% !important;
+  margin: 0.5em 0 !important;
+}
+```
+
 # Porting s2n-bignum to Lean 4
 
 %%%
@@ -55,17 +69,25 @@ Each function ships with a *machine-checked proof* in HOL Light:
 - Based on a formal model of the underlying processor (ARM or x86)
 - The model specifies exactly how each instruction modifies registers, flags, and memory
 
-Not testing — *proof*.
-
 
 # Two Kinds of Routines
 
 Each operation ships in *two variants*:
 
-| Variant | Goal | Trade-off |
-|---|---|---|
-| _Optimized_ | Maximum throughput | Hard to verify directly |
-| _Verification-friendly_ | Easier to prove | Slower in practice |
+:::table +colHeaders +stripedRows +border
+*
+  * Variant
+  * Goal
+  * Trade-off
+*
+  * *Optimized*
+  * Maximum throughput
+  * Hard to verify directly
+*
+  * *Verification-friendly*
+  * Easier to prove
+  * Slower in practice
+:::
 
 The library proves:
 
@@ -81,8 +103,7 @@ All functions are implemented in *constant time*:
 - Never on actual numeric values
 - Protects against timing side-channel attacks
 
-> An attacker who can measure execution time must learn nothing
-> about secret inputs.
+> An attacker who can measure execution time must learn nothing about secret inputs.
 
 
 # Library Structure (HOL Light)
@@ -204,13 +225,32 @@ backgroundColor := "#0073A3"
 
 # Key Differences: Types
 
-| Aspect | HOL Light | Lean 4 |
-|---|---|---|
-| 64-bit words | `:(64)word` | `BitVec 64` |
-| Memory | Component abstraction | `Address → Option UInt8` |
-| Natural numbers | HOL `num` | Lean `Nat` (kernel) |
-| Proof style | Tactic-only | Tactic + term-mode |
-| Ecosystem | `Library/words.ml` | Mathlib `BitVec` |
+:::table +colHeaders +stripedRows +border
+*
+  * Aspect
+  * HOL Light
+  * Lean 4
+*
+  * 64-bit words
+  * `:(64)word`
+  * `BitVec 64`
+*
+  * Memory
+  * Component abstraction
+  * `Address → Option UInt8`
+*
+  * Natural numbers
+  * HOL `num`
+  * Lean `Nat` (kernel)
+*
+  * Proof style
+  * Tactic-only
+  * Tactic + term-mode
+*
+  * Ecosystem
+  * `Library/words.ml`
+  * Mathlib `BitVec`
+:::
 
 
 # Key Differences: Proofs
@@ -381,8 +421,8 @@ backgroundColor := "#0073A3"
 
 *Alexandre Rademaker*
 
-Atlas Computing | FGV/EMAp
+FGV/EMAp | CSLib
 
 `github.com/atlas-computing-org/bignum`
 
-`admin@atlascomputing.org`
+`arademaker@gmail.com`
