@@ -1,6 +1,9 @@
 import VersoSlides
 import Verso.Doc.Concrete
+import Bignum.Arm.Machine.State
+import Bignum.Arm.Spec
 open VersoSlides
+open Bignum Bignum.Arm
 
 set_option maxHeartbeats 800000
 set_option linter.unusedVariables false
@@ -32,7 +35,7 @@ Alexandre Rademaker
 
 FGV/EMAp | CSLib Director at Renaissance Philanthropy
 
-2026
+INRIA Paris 2026
 
 
 # Part 1: The s2n-bignum Library
@@ -46,7 +49,7 @@ backgroundColor := "#0073A3"
 
 > s2n-bignum is a collection of integer arithmetic routines designed for cryptographic applications. All routines are written in pure machine code, designed to be callable from C and other high-level languages, with separate but API-compatible versions of each function for 64-bit x86 (x86\_64) and ARM (aarch64).
 
-`github.com/awslabs/s2n-bignum`
+[https://github.com/awslabs/s2n-bignum](https://github.com/awslabs/s2n-bignum)
 
 Primary goals: *performance* and *assurance*
 
@@ -61,49 +64,37 @@ Primary goals: *performance* and *assurance*
   - Curve25519, NIST P-256/384/521, secp256k1, SM2
 
 
+# Constant-Time Design
+
+> The actual sequence of machine instructions executed, including the specific addresses and sequencing of memory loads and stores, is *independent of the numbers themselves*, depending only on their *nominal sizes*.
+
+Consequences:
+
+- No stripping of leading zeros, no dynamic memory allocation
+- Results that do not fit are *truncated modulo* the output size
+- Sizes are explicit parameters — fixed at call time
+
+```code c
+void bignum_mul(uint64_t p, uint64_t *z,
+                uint64_t m, uint64_t *x,
+                uint64_t n, uint64_t *y);
+```
+
+`x` is an `m`-digit bignum, `y` is `n`-digit; result written to `p`-word buffer `z`.
+
+
 # Formal Verification in HOL Light
 
 Each function ships with a *machine-checked proof* in HOL Light:
 
-- Proves the mathematical result is correct *for all possible inputs*
+- Proves the mathematical result is correct
 - Based on a formal model of the underlying processor (ARM or x86)
 - The model specifies exactly how each instruction modifies registers, flags, and memory
 
-
-# Two Kinds of Routines
-
-Each operation ships in *two variants*:
-
-:::table +colHeaders +stripedRows +border
-*
-  * Variant
-  * Goal
-  * Trade-off
-*
-  * *Optimized*
-  * Maximum throughput
-  * Hard to verify directly
-*
-  * *Verification-friendly*
-  * Easier to prove
-  * Slower in practice
-:::
-
-The library proves:
-
-1. The optimized version runs in *constant time*
-2. Both versions are *functionally equivalent*
-
-
-# Constant-Time Design
-
-All functions are implemented in *constant time*:
-
-- Execution time depends only on *nominal parameter sizes*
-- Never on actual numeric values
-- Protects against timing side-channel attacks
-
-> An attacker who can measure execution time must learn nothing about secret inputs.
+- [Relational Hoare Logic for Realistically Modelled Machine Code](https://link.springer.com/chapter/10.1007/978-3-031-98668-0_19).
+- [Formal verification makes RSA faster — and faster to deploy](https://www.amazon.science/blog/formal-verification-makes-rsa-faster-and-faster-to-deploy)
+- [Better-performing “25519” elliptic-curve cryptography](https://www.amazon.science/blog/better-performing-25519-elliptic-curve-cryptography)
+- Dan J. Bernstein (creator of elliptic curve Curve25519) ["OpenSSL/BoringSSL must use s2n-bignum!"](https://youtu.be/iQzKFy6avIw?si=ahk5xEQY4rPDOpVC)
 
 
 # Library Structure (HOL Light)
@@ -111,7 +102,7 @@ All functions are implemented in *constant time*:
 ```code bash
 s2n-bignum/
 ├── arm/
-│   ├── proofs/          # ~150 HOL Light proof files
+│   ├── proofs/          # ~351 HOL Light files
 │   │   ├── bignum_add.ml
 │   │   ├── bignum_mul.ml
 │   │   └── ...
@@ -124,75 +115,127 @@ s2n-bignum/
     └── bignum.ml        # core definitions
 ```
 
+# Why HOL Light?
 
-# Part 2: Why Port to Lean 4?
+- Because [John Harrison](https://www.cl.cam.ac.uk/~jrh13/) is the creator of HOL Light!
+- HOL Light is an interactive theorem prover, like Lean
 
-%%%
-backgroundColor := "#0073A3"
-%%%
+# Verifying Assembly in s2n-bignum
 
+{image "static/s2n-bignum.jpg" (width := "90%")}[Verification pipeline: assembly source to HOL Light proof]
 
 # Why Port to Lean 4?
 
-- HOL Light state-of-the-art, but: OCaml ecosystem, smaller community
 - Lean 4 advantages:
   - Same language for *code and proofs* — no translation layer
   - *Mathlib*: 2M+ lines of mathematics, growing fast
   - Active community, modern tooling (Lake, LSP, VS Code)
   - Lean is implemented in Lean — highly extensible
-- Goal: make this verification infrastructure accessible to the
-  broader Lean community
+  - Performance
+- Goal: make this verification infrastructure accessible to the broader Lean community
 
 
-# Part 3: General Modeling
+# Part 3: General Model
 
 %%%
 backgroundColor := "#0073A3"
 %%%
 
+# ARM model
 
-# Machine States
+%%%
+vertical := some true
+%%%
 
-A *state* Σ is a function from observable resources to values:
+## Machine State
 
-- ARM: 32 general-purpose registers, flags, memory, program counter
-- x86: instruction pointer `rip`, extended flags, memory
+32 general-purpose registers, flags, memory, program counter
 
-```code lean
+```lean
+-- !hide
+namespace Slide
+-- !end hide
+public abbrev Word64 := BitVec 64
+abbrev Address := Word64
+def Memory := Address → Option UInt8
+
+inductive Reg
+  | X  : Fin 31 → Reg  -- X0–X30
+  | PC : Reg
+  | SP : Reg
+
 structure ArmState where
-  regs   : Fin 32 → BitVec 64
-  pc     : BitVec 64
-  flags  : Flags
-  memory : Address → Option UInt8
+  regs  : /- !replace Slide.Reg -/ Reg /- !end replace -/ → Word64
+  flags : Flags
+  mem   : Memory
+-- !hide
+end Slide
+-- !end hide
 ```
 
-Single uniform type — no special cases for different resources.
 
+## Decode-Execute Pipeline
 
-# Operational Semantics
+```code text
+ Memory (List UInt8)
+         │
+         ▼
+ arm_decode (Spec.lean)          -- reads 4 bytes at PC
+   └─→ decode : UInt32 →         -- Decode.lean
+         Option Instruction
+         │
+         ▼
+ step : Instruction →            -- Instruction.lean
+          ArmState → ArmState
+   ├─→ read_reg / write_reg      -- State.lean
+   └─→ advance_pc
+         │
+         ▼
+ exec : List Instruction →       -- folds step over list
+          ArmState → ArmState
+         │
+         ▼
+ arm : ArmState → ArmState →     -- single-step relation
+         Prop                    -- used in ensures triples
+```
+
+`ensures_of_exec` bridges `exec` and `arm`, reducing Hoare
+proofs to: (1) decode, (2) post-condition, (3) frame.
+
+## ARM Instruction Semantics
 
 Execution is *instruction-by-instruction*:
 
 ```code lean
-def step (s : ArmState) : ArmState :=
-  let bytes := s.memory.read s.pc 4
-  let instr := decode bytes
-  execute instr s
+def advance_pc (s : ArmState) (s' : ArmState) : ArmState :=
+  s'.write_reg Reg.PC (s.read_reg Reg.PC + 4)
+
+def step (instr : Instruction) (s : ArmState) : ArmState :=
+  match instr with
+  | Instruction.ADD rd rn rm =>
+    -- Xd := Xn + Xm (word addition, no flags)
+    let val_n := s.read_reg rn
+    let val_m := s.read_reg rm
+    let result := val_n + val_m  -- BitVec addition (wraps at 2^64)
+    advance_pc s (s.write_reg rd result)
+  ...
 ```
-
-Full decode-execute loop, no abstraction over instruction sets.
-
 
 # Hoare-Style Specifications
 
 We use `ensures` triples — Hoare logic adapted to machine code:
 
-```code lean
-def ensures (pre  : ArmState → Prop)
-            (prog : List UInt8)
-            (post : ArmState → ArmState → Prop) : Prop :=
-  ∀ s₀, pre s₀ →
-    ∃ s₁, exec prog s₀ = s₁ ∧ post s₀ s₁
+```lean
+-- !hide
+namespace Slide
+-- !end hide
+def ensures (step : α → α → Prop) (pre post : α → Prop)
+  (frame : α → α → Prop) : Prop :=
+  ∀ s, pre s → eventually step
+    (fun s' => post s' ∧ frame s s') s
+-- !hide
+end Slide
+-- !end hide
 ```
 
 - *pre*: precondition on initial state
@@ -222,53 +265,26 @@ This enables *modular* proofs — verify each chunk independently.
 backgroundColor := "#0073A3"
 %%%
 
-
-# Key Differences: Types
-
-:::table +colHeaders +stripedRows +border
-*
-  * Aspect
-  * HOL Light
-  * Lean 4
-*
-  * 64-bit words
-  * `:(64)word`
-  * `BitVec 64`
-*
-  * Memory
-  * Component abstraction
-  * `Address → Option UInt8`
-*
-  * Natural numbers
-  * HOL `num`
-  * Lean `Nat` (kernel)
-*
-  * Proof style
-  * Tactic-only
-  * Tactic + term-mode
-*
-  * Ecosystem
-  * `Library/words.ml`
-  * Mathlib `BitVec`
-:::
-
-
 # Key Differences: Proofs
 
 HOL Light (OCaml meta-language):
 
 ```code ocaml
 let HIGH_LOW_DIGITS = prove
- (`(!n i. 2 EXP (64 * i) * highdigits n i + lowdigits n i = n)`,
-  REWRITE_TAC[highdigits; lowdigits] THEN
-  MESON_TAC[DIVISION]);;
+ (`(!n i. 2 EXP (64 * i) * highdigits n i + lowdigits n i = n) /\
+   (!n i. lowdigits n i + 2 EXP (64 * i) * highdigits n i = n) /\
+   (!n i. highdigits n i * 2 EXP (64 * i) + lowdigits n i = n) /\
+   (!n i. lowdigits n i + highdigits n i * 2 EXP (64 * i) = n)`,
+  REWRITE_TAC[lowdigits; highdigits] THEN
+  MESON_TAC[DIVISION_SIMP; ADD_SYM; MULT_SYM]);;
 ```
 
 Lean 4 (same language as definitions):
 
-```code lean
-theorem high_low_digits (n i : Nat) :
-    2 ^ (64 * i) * highdigits n i + lowdigits n i = n := by
+```lean
+theorem high_low_digits (n i : Nat)
+  : 2 ^ (64 * i) * highdigits n i + lowdigits n i = n
+  := by
   unfold highdigits lowdigits
   exact Nat.div_add_mod n (2 ^ (64 * i))
 ```
@@ -278,25 +294,21 @@ theorem high_low_digits (n i : Nat) :
 
 Every Lean file maps back to its HOL Light source:
 
-```code lean
+```lean
 /--
-Corresponds to HOL Light theorem:
-  let BIGDIGIT_HIGHDIGITS = prove
-   (`!n i j. bigdigit (highdigits n i) j = bigdigit n (i + j)`, ...);;
-Source: s2n-bignum/common/bignum.ml:164-167
+If n is bounded, then highdigits n i = 0.
+
+Source: s2n-bignum/common/bignum.ml:113-115
 -/
-theorem bigdigit_highdigits (n i j : Nat) :
-    bigdigit (highdigits n i) j = bigdigit n (i + j) := by
-  unfold bigdigit highdigits
-  rw [Nat.mul_add, Nat.pow_add, Nat.div_div_eq_div_mul]
+theorem highdigits_of_lt (n i : Nat) (h : n < 2 ^ (64 * i)) :
+    highdigits n i = 0 := by
+  rw [highdigits_eq_zero]
+  exact h
 ```
-
-Line-by-line traceability maintained throughout.
-
 
 # Lean Project Structure
 
-```code bash
+```code text
 bignum-lean/
 ├── Bignum/
 │   ├── Common/
@@ -323,63 +335,72 @@ backgroundColor := "#0073A3"
 
 # Tutorial 1: Simple
 
-Port of `s2n-bignum/arm/tutorial/simple.ml` — two instructions:
+Port of `s2n-bignum/arm/tutorial/simple.ml`
 
 ```code asm
-add x2, x1, x0    -- x2 := x1 + x0
-sub x2, x2, x1    -- x2 := x2 - x1
+0:   8b000022        add     x2, x1, x0
+4:   cb010042        sub     x2, x2, x1
 ```
 
-*Claim*: starting with `X0 = a`, `X1 = b`, we end with `X2 = a`.
+# Tutorial 1: The Claim
+
+Starting with `X0 = a`, `X1 = b`, after both instructions: `X2 = a`.  Only `PC` and `X2` change.
 
 ```code lean
-theorem simple_correct (s : ArmState) ... :
-    ensures
-      (fun s => s.regs X0 = a ∧ s.regs X1 = b)
-      simple_mc
-      (fun _ s' => s'.regs X2 = a)
+theorem SIMPLE_SPEC (pc a b : ℕ) :
+    ensures arm
+      (fun s => aligned_bytes_loaded s.mem (BitVec.ofNat 64 pc) simple_mc ∧
+                s.read_reg Reg.PC = BitVec.ofNat 64 pc ∧
+                s.read_reg Reg.X0 = BitVec.ofNat 64 a ∧
+                s.read_reg Reg.X1 = BitVec.ofNat 64 b)
+      (fun s => s.read_reg Reg.PC = BitVec.ofNat 64 (pc + 8) ∧
+                s.read_reg Reg.X2 = BitVec.ofNat 64 a)
+      (maychange_regs [Reg.PC, Reg.X2]) := by
 ```
 
+# Tutorial 1: Proof Strategy
 
-# Tutorial 1: What We Learn
-
-- *Loading bytes*: from `simple_mc : List UInt8`
-- *Decoding*: bytes → `Instruction` via `Decode.lean`
-- *Simulation*: `exec simple_mc s₀` gives the final state
-- *Frame conditions*: all other registers/memory unchanged
-- *`ensures_of_exec`*: reduces proof to decode + post + frame
-
-Corresponds to ~30 lines of Lean vs ~40 lines of HOL Light.
-
+- 1. Decode: bytes → Instruction list (2 lines)
+- 2. Post: postcondition holds after exec (10 lines)
+- 3. Frame: other registers unchanged (5 lines)
 
 # Tutorial 2: Sequence
 
-Port of `s2n-bignum/arm/tutorial/sequence.ml` — four instructions:
+Port of `s2n-bignum/arm/tutorial/sequence.ml`
 
 ```code asm
-add x1, x1, x0    -- x1 := x1 + x0
-add x2, x2, x0    -- x2 := x2 + x0
-mov x3, #2
-mul x1, x1, x3    -- x1 := x1 * 2
+0:   8b000021        add     x1, x1, x0
+4:   8b000042        add     x2, x2, x0
+8:   d2800043        mov     x3, #0x2
+c:   9b037c21        mul     x1, x1, x3
 ```
 
-*Key technique*: compositional verification via `ensures_sequence`
+# Tutorial 2: The Approach
 
-1. Split at `pc+8` into two chunks
-2. Prove intermediate assertion: `X1 = a + b`
-3. Compose results with `ensures_sequence`
+1. Split at pc+8 into two chunks:
+   - First chunk (pc to pc+8): two `add` instructions
+   - Second chunk (pc+8 to pc+16): `mov` and `mul`
 
+2. Intermediate assertion at pc+8: `X1 = a + b`
 
-# Tutorial 2: What We Learn
+3. Prove each chunk with `ensures_of_exec`, compose with `ensures_sequence`.
 
-- *`ensures_sequence`*: sequential composition of proofs
-- *Intermediate assertions*: explicit intermediate state
-- *`ensures_of_exec`*: each chunk proved independently
+# Tutorial 2: Proof by Composition
 
-Original HOL Light: ~185 lines (manual `eventually.ind`)
+```code lean
+theorem sequence_correct (pc a b c : ℕ) :
+    ensures arm
+      (sequence_pre pc a b c)
+      (sequence_post pc a b)
+      (maychange_regs [Reg.PC, Reg.X1, Reg.X2, Reg.X3]) :=
+  ensures_sequence _ _ _
+    (maychange_regs [Reg.PC, Reg.X1, Reg.X2, Reg.X3])
+    (sequence_chunk1_correct pc a b c)
+    (sequence_chunk2_correct pc a b)
+    (maychange_regs_trans _)
+```
 
-Lean port with `ensures_of_exec`: significantly shorter,
-proofs read more directly as specifications.
+Original HOL Light: ~185 lines. Lean port: ~100 lines.
 
 
 # Part 6: Next Steps
@@ -388,29 +409,31 @@ proofs read more directly as specifications.
 backgroundColor := "#0073A3"
 %%%
 
+# Conclusion
+
+- First version of ARM architecture
+- First two tutorials completed
+- Building the Lean project is faster than load HOL Light
+
+# High-level integration
+
+- Connect to CSLib
+- Connect to Mathlib
+- End-to-end proofs from algorithm to assembly
 
 # Next Steps
 
-*1. Port ARM arithmetic algorithm proofs*
+1. Port ARM arithmetic algorithm proofs
+   - `bignum_add`, `bignum_mul`, `bignum_sub`, modular reduction...
+   - Revise infrastructure (Spec, Tactic, Decode) in place
 
-- `bignum_add`, `bignum_mul`, `bignum_sub`, modular reduction, ...
-- The infrastructure (Spec, Tactic, Decode) is in place
-- This is the main pending work
+2. x86-64 support
+   - Adapt the ARM machine model for x86-64
+   - Port the x86 proofs from s2n-bignum
 
-*2. x86-64 support*
-
-- Mirror the ARM machine model for x86-64
-- Port the x86 proofs from s2n-bignum
-
-*3. Relational verification*
-
-- Constant-time proofs (`compare` vs `cst-compare`)
-- Functional equivalence between optimized and verification-friendly routines
-
-*4. High-level integration*
-
-- Connect to Mathlib number theory
-- End-to-end proofs from algorithm to assembly
+3. Relational verification (see the [paper](https://link.springer.com/chapter/10.1007/978-3-031-98668-0_19))
+   - Constant-time proofs
+   - Functional equivalence between optimized and verification-friendly routines
 
 
 # Thank You

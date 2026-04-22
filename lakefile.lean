@@ -4,6 +4,9 @@ open System Lake DSL
 require «verso-slides» from git
   "https://github.com/leanprover/verso-slides.git"@"main"
 
+require bignum from git
+  "https://github.com/atlas-computing-org/bignum.git"@"main"
+
 package «svil2026» where
   version := v!"0.1.0"
 
