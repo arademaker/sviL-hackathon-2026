@@ -33,7 +33,7 @@ backgroundColor := "#0073A3"
 
 Alexandre Rademaker
 
-FGV/EMAp | CSLib Director at Renaissance Philanthropy
+FGV/EMAp | CSLib at Renaissance Philanthropy
 
 INRIA Paris 2026
 
@@ -90,6 +90,9 @@ Each function ships with a *machine-checked proof* in HOL Light:
 - Proves the mathematical result is correct
 - Based on a formal model of the underlying processor (ARM or x86)
 - The model specifies exactly how each instruction modifies registers, flags, and memory
+
+
+# Why is this relevant?
 
 - [Relational Hoare Logic for Realistically Modelled Machine Code](https://link.springer.com/chapter/10.1007/978-3-031-98668-0_19).
 - [Formal verification makes RSA faster — and faster to deploy](https://www.amazon.science/blog/formal-verification-makes-rsa-faster-and-faster-to-deploy)
