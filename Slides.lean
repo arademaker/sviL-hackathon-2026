@@ -290,29 +290,20 @@ let HIGH_LOW_DIGITS = prove
 Lean 4 (same language as definitions):
 
 ```lean
-theorem high_low_digits (n i : Nat)
-  : 2 ^ (64 * i) * highdigits n i + lowdigits n i = n
-  := by
-  unfold highdigits lowdigits
-  exact Nat.div_add_mod n (2 ^ (64 * i))
-```
-
-
-# HOL Light Correspondence
-
-Every Lean file maps back to its HOL Light source:
-
-```lean
 /--
-If n is bounded, then highdigits n i = 0.
+Compositionality of highdigits: taking highdigits twice is equivalent to adding
+indices.
 
-Source: s2n-bignum/common/bignum.ml:113-115
+Source: s2n-bignum/common/bignum.ml:169-172
 -/
-theorem highdigits_of_lt (n i : Nat) (h : n < 2 ^ (64 * i)) :
-    highdigits n i = 0 := by
-  rw [highdigits_eq_zero]
-  exact h
+theorem highdigits_highdigits (n i j : Nat) :
+    highdigits (highdigits n i) j = highdigits n (i + j) := by
+  unfold highdigits
+  rw [Nat.mul_add, Nat.pow_add, Nat.div_div_eq_div_mul]
 ```
+
+Every Lean definition maps back to its HOL Light source equivalence.
+
 
 # Lean Project Structure
 
