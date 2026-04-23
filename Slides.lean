@@ -91,6 +91,11 @@ Each function ships with a *machine-checked proof* in HOL Light:
 - Based on a formal model of the underlying processor (ARM or x86)
 - The model specifies exactly how each instruction modifies registers, flags, and memory
 
+Two logics, both mechanized in HOL Light:
+
+- *L1* (unary): functional correctness via Hoare triples — `eventually` operator, ~860K lines of proofs covering 600+ routines. It is implemented in 10k lines of HOL Light.
+- *L2* (relational): extends L1 with step-counting `eventually` to prove *constant-time* behavior and equivalence between optimized and reference implementations. The core of the relational verification amounts to 1704 lines of code.
+
 
 # Why is this relevant?
 
