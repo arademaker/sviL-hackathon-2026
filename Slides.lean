@@ -159,26 +159,11 @@ vertical := some true
 
 32 general-purpose registers, flags, memory, program counter
 
-```lean
--- !hide
-namespace Slide
--- !end hide
-public abbrev Word64 := BitVec 64
-abbrev Address := Word64
-def Memory := Address → Option UInt8
-
-inductive Reg
-  | X  : Fin 31 → Reg  -- X0–X30
-  | PC : Reg
-  | SP : Reg
-
+```leanLibCode Bignum.Arm.Machine.State (startLine := 135) (endLine := 138)
 structure ArmState where
-  regs  : /- !replace Slide.Reg -/ Reg /- !end replace -/ → Word64
-  flags : Flags
-  mem   : Memory
--- !hide
-end Slide
--- !end hide
+  regs : Reg → Word64    -- Register values
+  flags : Flags          -- Condition flags
+  mem : Memory           -- Memory state
 ```
 
 

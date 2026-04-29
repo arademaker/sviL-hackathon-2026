@@ -2,13 +2,14 @@
 # Porting s2n-bignum to Lean 4
 
 Slide presentation about porting the formal verification of Amazon's
-[s2n-bignum](https://github.com/awslabs/s2n-bignum) library from HOL Light to
-Lean 4. Built with [Verso](https://verso.lean-lang.org/).
+[s2n-bignum](https://github.com/awslabs/s2n-bignum) library from HOL
+Light to Lean 4. Built with [Verso](https://verso.lean-lang.org/).
 
 The Lean port lives at `../bignum`
 ([github.com/atlas-computing-org/bignum](https://github.com/atlas-computing-org/bignum)).
 
-The slides were presented in [Software Verification in Lean Hackathon](https://beneficial-ai-foundation.github.io/SVIL2026/).
+The slides were presented in [Software Verification in Lean
+Hackathon](https://beneficial-ai-foundation.github.io/SVIL2026/). 
 
 ## Prerequisites
 
@@ -84,3 +85,6 @@ Apache 2.0
   `references/article.pdf`
 
 - previous presentation about the project 'bignum2026.pptx'
+
+
+

@@ -10,6 +10,7 @@ require bignum from git
 package «svil2026» where
   version := v!"0.1.0"
 
-lean_lib Slides
+lean_lib Slides where
+  needs := #[`+Bignum.Arm.Machine.State:highlighted]
 
 @[default_target] lean_exe «svil2026» where root := `Main
